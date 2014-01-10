@@ -1,0 +1,20 @@
+2013/9/15
+bug: 取得所有文章及其文字數量的 dictionary/{Doc:Char_ct, ...} 時，文字數量計算出錯
+file: tools.py
+class:	Search
+function:	cacheSectionInf()
+line:		328
+org code:		ct = k[2]-k[1]/self.calen
+debuged:		ct = (k[2]-k[1])/self.calen
+
+
+[Bug report]
+Traceback (most recent call last):
+  File "./utility.py", line 194, in <module>
+    getIndexOffsetRange(pth, 'others')
+  File "./utility.py", line 138, in getIndexOffsetRange
+    print Scher.getSecOfstRange([k[0]], '')
+  File "/usr/local/lib/python2.6/dist-packages/cnlstk/tools.py", line 353, in getSecOfstRange
+    r = self.Tobj_f.getRange(k)
+  File "/usr/local/lib/python2.6/dist-packages/cnlstk/SuffixArray.py", line 772, in getRange
+    position = unpack( '17sII', self.cache_line.read(calcsize('17sII')) )
