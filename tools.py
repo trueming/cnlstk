@@ -564,8 +564,14 @@ class Search:
 		if opt == 'f': return self.Tobj_f.getText(ofst, bw, aw)
 		elif opt == 'b': return self.Tobj_b.getText(ofst, bw, aw)
 		else: return 'opt="f" or opt="b"'
-		
-
+	
+	
+	# ＃＃＃＃＃＃	#
+	#  布林合併	#
+	# ＃＃＃＃＃＃	#
+	
+	
+	
 	# ＃＃＃＃＃＃	#
 	#  其他工具	#
 	# ＃＃＃＃＃＃	#

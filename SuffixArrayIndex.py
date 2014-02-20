@@ -8,14 +8,9 @@ Updated by TRuEmInG (2011 spring) at NTU ESOE for CNLSTK, Web API
 Updated by TRuEmInG (2013 winter) at NTU ESOE for CNLSTK, modify package structure
 """
 
-"""
-section 的統一輸入設計		id, name, time, time_id, place, place_id
-"""
-
 import os, re, sys, cPickle
 from struct import *
 from time import time, strftime, gmtime
-
 from utility import *
 
 
