@@ -59,6 +59,15 @@ class SA_Index(object):
 		self.F.seek( ofst )
 		bytes = length * self.salen		#轉成 bytes 數
 		return self.F.read(bytes).decode(self.coding)
+		
+	def __backwardStr__( self, strg ):
+		'''
+		Return a backward string of "strg", and its length
+		回傳 字串及長度（ len(一個unicode五碼字) = 2 ）
+		'''
+		L = convertStr2List(strg)
+		L.reverse()
+		return (''.join(L), len(L))
 
 
 	######################
@@ -290,7 +299,7 @@ class SA_Index(object):
 			while SAspot < self.S_len:
 				self.S.seek(SAspot)
 				offset = unpack( 'I', self.S.read(calcsize('I')) )[0]
-				string = self.__getWords( offset, ng )
+				string = self.__getWords__( offset, ng )
 				
 				#長度少於 gram（到了檔尾）就跳過
 				if countStrLen(string) < ng:
@@ -301,7 +310,7 @@ class SA_Index(object):
 				#limit 頻率的字串最多有 limit 個 next word。（直接檢索 1000 次的速度尚可接受，無需建索引。）
 				#如果比 limit 還少，勢必沒有 > limit 數量的 next，所以跳過不用建索引。
 				if self.opt == 'schbk':
-					sw = self.__backwardStr(string)[0]
+					sw = self.__backwardStr__(string)[0]
 				else:
 					sw = string
 				n = self.doSearch(sw)
@@ -313,7 +322,7 @@ class SA_Index(object):
 #				raw_input()
 				for k in range(1, nc+1):
 					svpth = path+('0'+str(fn))[-2:]+'/'+str(fn)
-					rst = self.__saveNextIndex(svpth, n[1], n[0], ng, k, limit)
+					rst = self.__saveNextIndex__(svpth, n[1], n[0], ng, k, limit)
 					if rst == 'Y':
 						DL[k-1][string] = fn
 						fn += 1
@@ -345,7 +354,7 @@ class SA_Index(object):
 		print strftime('%H:%M:%S', gmtime(Tm-Ts))
 		return 'next index ok'
 
-	def __saveNextIndex(self, fn, SAspot, times, kwlen, extlen, limit):
+	def __saveNextIndex__(self, fn, SAspot, times, kwlen, extlen, limit):
 		'''
 		fn: 如果要存索引的話的檔名
 		SAspot: SA 開始位置
@@ -372,10 +381,10 @@ class SA_Index(object):
 		while times > ct:
 			self.S.seek( SAspot )
 			offset = unpack( 'I', self.S.read(calcsize('I')) )[0]
-			n = self.__getWords( offset, kwlen+extlen )		#取得延伸後的字串
+			n = self.__getWords__( offset, kwlen+extlen )		#取得延伸後的字串
 			'''m = n[-extlen:]'''
 			if self.opt == 'schbk':
-				n = self.__backwardStr(n)[0]
+				n = self.__backwardStr__(n)[0]
 			rst = self.doSearch(n)					#檢索次數
 			'''
 			if (m[0] >= u'\u3100' and m[0] <= u'\uFE4F') or (m[0] >= u'\U00020000' and m[0] <= u'\U000F789F'):
@@ -415,7 +424,7 @@ class SA_Index(object):
 			1. [offset,...]
 			2. 正：[ (offset, position),... ]
 			3. 反：[ (offset, position),... ]
-		存在目錄 ofst-100000/ 下
+		存在目錄 ofst-100000/ 下，減輕檢索負擔用。先將較耗時的字串查好存起來，要call search function。
 		** 註：CBETA 2010	正 > 100000 [1-gram:361, 2-gram:81, 3-gram:3, 4-gram:0]
 							反 > 100000 [1-gram:361, 2-gram:79, 3-gram:1, 4-gram:0]
 		FF0C_A, 3002_A, 4E5F_3002_A, 29_3002_A 四字串無 -b
@@ -431,7 +440,7 @@ class SA_Index(object):
 			self.S.seek(SAspot)
 			offset = unpack( 'I', self.S.read(calcsize('I')) )[0]
 			for k in range(gram):
-				tmpw = self.__getWords( offset, k+1 )
+				tmpw = self.__getWords__( offset, k+1 )
 				if L[k] == tmpw:
 					C[k] += 1
 				else:
@@ -439,7 +448,7 @@ class SA_Index(object):
 #						tmp = self.doSearch(L[k])
 #						print L[k], C[k], tmp
 #						raw_input()
-						self.__saveOfstList( L[k], ofstlistpath )
+						self.__saveOfstList__( L[k], ofstlistpath )
 						T[k] += 1
 					L[k] = tmpw
 					C[k] = 1
@@ -448,14 +457,14 @@ class SA_Index(object):
 		# ** 如果 T 中還有不為 0 的表示可以再加一個 gram 長然後再跑一次
 		print 'n-gram >', freq, 'string count:', T
 	
-	def __saveOfstList( self, string, path ):
+	def __saveOfstList__( self, string, path ):
 		'''
 		記錄傳入的字串的兩種正反共四個 offset lists
 		'''
 		strL = convertStr2List(string, 1)
 		if self.opt == 'schbk':
 			strL.reverse()
-			string = self.__backwardStr(string)[0]	#字串如果是反的要反正後再 doSearch()
+			string = self.__backwardStr__(string)[0]	#字串如果是反的要反正後再 doSearch()
 		fn = '_'.join(strL)							#索引檔名（正反向檔案都是正向 unicode 碼的檔名）
 #		print 'save:', string, fn
 		tmp = self.doSearch(string)

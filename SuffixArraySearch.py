@@ -21,58 +21,66 @@ from utility import *
 class SA_Search:
 	'''建立與檢索 Suffix Array 的 class'''
 	
-	def __init__( self, fname, opt, salen, coding, suffix='', lbindex='', next=[], ofst=[] ):
+	def __init__( self, fname, opt, suffix, lbindex, next=[], ofst=[] ):
 		'''
 		[ fname ] = the main text file. 
-		[ opt ] = 'index', 'sch', 'schbk'
-		[ salen ] = Suffix Array index length
-		[ coding ] = main text encode
+		[ opt ] = 'sch', 'schbk'
 		[ suffix ] = the Suffix Array of fname
 		[ lbindex ] = section index of fname
 		[ next ] = list of next indexes files (next[0]=index folder, next[1:]=ext dictionary indexes)
 		[ ofst ] = list of freq. ofst indexes info. (folder, freq.)
 		'''
-		ntf = open(os.path.split(fname)[0]+'/encode', 'w')
-		ntf.write(coding+','+str(salen))
+		########################
+		# 取得主文擋編碼和索引的長度 ex:'utf32,4'
+		########################
+		ntf = open(os.path.split(fname)[0]+'/encode', 'r')
+		tmp = ntf.read().strip().split(',')
 		ntf.close()
 		
+		####################
+		# Initial parameters
+		####################
 		self.F = open( fname, 'rb' )			##開啟主文字檔##
 		self.F_len = os.stat( fname )[6]		##主文字檔大小
 		self.File_main = fname					##主要檔的檔名##
 		self.opt = opt
-		self.salen = salen						##檔案中索引距離的長度（與 self.coding 相應）
-		self.coding = coding					##檔案編碼
+		self.salen = int(tmp[1])				##檔案中索引距離的長度（與 self.coding 相應）
+		self.coding = tmp[0]					##檔案編碼
 		
-		'''
-		若有 BOM 在反向檔會影響 getRangWords()，要將其 offset 加回去。
-		getBL(), getRange(), getSectionInf() 等若改成反向檔用算的不用目前的反向索引 BOM 將有影響
-		'''
+		#####################
+		# 檢查全文檔頭是否有 BOM
+		# 若有 BOM 在反向檔會影響 getRangWords()，要將其 offset 加回去。 getBL(), getRange(), getSectionInf() 等若改成反向檔用算的不用目前的反向索引 BOM 將有影響
+		#####################
 		bom = ['\xff\xfe', '\xfe\xff']			##檢查全文檔頭是否有 BOM
-		if self.F.read(2) not in bom:
-			self.bom = 'N'
-		else:
-			self.bom = 'Y'
+		if self.F.read(2) not in bom: self.bom = 'N'
+		else: self.bom = 'Y'
 		self.F.seek(0)
 		
-		if suffix != '':
-			self.S = open( suffix, 'rb' )		##主要檔案的 Suffix Array##
-			self.S_len = os.stat( suffix )[6]	##Suffix Array 的檔案大小##
-			self.Suffix_A = suffix				##主要 Suffix Array 的檔名##
-			if self.S_len > 1000000:				#1mb 大小以上的 Suffix Array 才建索引 cache
-				self.cache_qt = 2048				#cache 陣列大小（最理想是改成和 self.S_len 長度動態對稱）
-				self.cache_p = [0]*self.cache_qt	##紀錄 Suffix Array 位置的 cache##
-				self.cache_w = ['']*self.cache_qt	##紀錄 self.cache_p 對應回 self.S 再對應回 self.F 的內容字串##
-				self.__getCache( 0, self.S_len/calcsize('I'), 1 )
-
-		if lbindex != '':
-			self.cache_line = open( lbindex, 'rb' )
-			self.cache_line_len = os.stat( lbindex )[6]
+		###################
+		# 準備 Suffix Array
+		###################
+		self.S = open( suffix, 'rb' )			##主要檔案的 Suffix Array##
+		self.S_len = os.stat( suffix )[6]		##Suffix Array 的檔案大小##
+		self.Suffix_A = suffix					##主要 Suffix Array 的檔名##
+		if self.S_len > 1000000:					#1mb 大小以上的 Suffix Array 才建索引 cache
+			self.cache_qt = 2048					#cache 陣列大小（最理想是改成和 self.S_len 長度動態對稱）
+			self.cache_p = [0]*self.cache_qt		##紀錄 Suffix Array 位置的 cache##
+			self.cache_w = ['']*self.cache_qt		##紀錄 self.cache_p 對應回 self.S 再對應回 self.F 的內容字串##
+			self.__getCache__( 0, self.S_len/calcsize('I'), 1 )
 		
+		#######################
+		# 準備檔名對 offset 的索引
+		#######################
+		self.cache_line = open( lbindex, 'rb' )
+		self.cache_line_len = os.stat( lbindex )[6]
+		
+		#######################
+		# next frequency index
+		#######################
 		self.nextPh = ''
 		self.nextlimit = 0				#over this freq. 有 next index
 		if next != []:
-			if next[0][-1] != '/':
-				next[0] += '/'
+			if next[0][-1] != '/': next[0] += '/'
 			self.nextPh = next[0]
 			self.NL = []
 			for k in next[1:]:
@@ -80,6 +88,9 @@ class SA_Search:
 				self.NL.append( cPickle.load(f) )
 				f.close()
 		
+		##############
+		# offset index
+		##############
 		self.ofstPh = ''
 		self.ofstlimit = self.F_len		#不可能有 frequency 大於檔案大小
 		if ofst != []:
@@ -94,7 +105,7 @@ class SA_Search:
 		'''
 
 ### Basic Utility ###
-	def __getCache( self, i, j, c ):
+	def __getCache__( self, i, j, c ):
 		'''
 		Create 2 cache lists for search.
 		[ i ] = the start position
@@ -106,13 +117,13 @@ class SA_Search:
 			self.cache_p[c] = k
 			self.S.seek( k*calcsize('I') )
 			ofst = unpack( 'I', self.S.read( calcsize('I') ) )[0]	##提出 self.S 實際值##
-			w = self.__getWords( ofst, 32 )							##取出 self.F 32個字（使用者輸入的 cache 比對字串長度）##
+			w = self.__getWords__( ofst, 32 )							##取出 self.F 32個字（使用者輸入的 cache 比對字串長度）##
 			self.cache_w[c] = w
 			
-			self.__getCache( i, k, c*2 )
-			self.__getCache( k, j, c*2+1)
+			self.__getCache__( i, k, c*2 )
+			self.__getCache__( k, j, c*2+1)
 
-	def __getWords( self, ofst, length ):
+	def __getWords__( self, ofst, length ):
 		'''
 		輸入 offset + 要取的字串長度
 		回傳 offset 開始向後（右）要取的長度字串
@@ -121,7 +132,7 @@ class SA_Search:
 		bytes = length * self.salen		#轉成 bytes 數
 		return self.F.read(bytes).decode(self.coding)
 		
-	def __getsdroW( self, ofst, length ):
+	def __getsdroW__( self, ofst, length ):
 		'''
 		輸入 offset + 要取的字串長度
 		回傳 offset 向前（左）要取的長度字串
@@ -156,7 +167,7 @@ class SA_Search:
 		self.S.seek( SAspot )
 		for k in range(ct):
 			offset = unpack( 'I', self.S.read( calcsize('I') ) )[0]
-			tmp = self.__getsdroW( offset, bw ) + self.__getWords( offset, aw )
+			tmp = self.__getsdroW__( offset, bw ) + self.__getWords__( offset, aw )
 			if self.opt == 'schbk':
 				tmp = self.__backwardStr( tmp )[0]
 			if opt == 1:
@@ -172,7 +183,7 @@ class SA_Search:
 			opt = 0 全文字串
 			opt = 1 全文字串與行號資訊
 		'''
-		tmp = self.__getsdroW( offset, bw ) + self.__getWords( offset, aw )
+		tmp = self.__getsdroW__( offset, bw ) + self.__getWords__( offset, aw )
 		if self.opt == 'schbk':
 			tmp = self.__backwardStr( tmp )[0]
 		if opt == 1:
@@ -425,8 +436,8 @@ class SA_Search:
 		while times > ct:		
 			self.S.seek( SAspot )
 			offset = unpack( 'I', self.S.read(calcsize('I')) )[0]
-			n = self.__getWords( offset, kwlen+extlen )
-			m = self.__getWords( offset+(kwlen*calcsize('I')), extlen)
+			n = self.__getWords__( offset, kwlen+extlen )
+			m = self.__getWords__( offset+(kwlen*calcsize('I')), extlen)
 			
 			#backward 的字串要反過來
 			if self.opt == 'schbk':
@@ -470,8 +481,8 @@ class SA_Search:
 				nL.append( ( m, (SApost-preSA)/calcsize('I') ) )		#SApost 前後相減便是該 ext 的數量
 			self.S.seek(SApost)											#索引中記錄的是 SAspot 所以要先去 self.S 中取出 offset 在去 self.F 中取得字串
 			offset = unpack( 'I', self.S.read(calcsize('I')) )[0]
-			n = self.__getWords( offset, kwlen+extlen )
-			m = self.__getWords( offset+(kwlen*calcsize('I')), extlen)
+			n = self.__getWords__( offset, kwlen+extlen )
+			m = self.__getWords__( offset+(kwlen*calcsize('I')), extlen)
 			if self.opt == 'schbk' and extlen > 1:
 				m = self.__backwardStr(m)[0]
 			preSA = SApost
@@ -527,7 +538,7 @@ class SA_Search:
 				break
 			self.S.seek( k*calcsize('I') )
 			offset = unpack( 'I', self.S.read( calcsize('I') ) )[0]	##suffix array 中該位置紀錄的 offset (for self.F)##
-			w = self.__getWords( offset, kw_len )		##每個offset向後抓KW同長度的字串##
+			w = self.__getWords__( offset, kw_len )		##每個offset向後抓KW同長度的字串##
 #			print w
 #			raw_input()	
 			if KW == w:	#比對到第一個
@@ -539,7 +550,7 @@ class SA_Search:
 					ks = ( i+k_bk )/2
 					self.S.seek( ks*calcsize('I') )
 					offset = unpack( 'I', self.S.read( calcsize('I') ) )[0]
-					w = self.__getWords( offset, kw_len )	#到每個offset向後抓KW同長度的字串來比
+					w = self.__getWords__( offset, kw_len )	#到每個offset向後抓KW同長度的字串來比
 					if KW == w:
 						sa_start_p = ks
 						k_bk = ks-1
@@ -552,7 +563,7 @@ class SA_Search:
 						break
 					self.S.seek( ks*calcsize('I') )
 					offset = unpack( 'I', self.S.read( calcsize('I') ) )[0]
-					w = self.__getWords( offset, kw_len )	#到每個offset向後抓KW同長度的字串來比
+					w = self.__getWords__( offset, kw_len )	#到每個offset向後抓KW同長度的字串來比
 					if KW == w:
 						sa_end_p = ks
 						k = ks+1
